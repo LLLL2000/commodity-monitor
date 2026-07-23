@@ -11,6 +11,11 @@ on:
       - "web/**"
       - "registry.json"
       - ".github/workflows/pages.yml"
+  # Redeploy after a cron publishes fresh data (the crons' bot commits use
+  # GITHUB_TOKEN, whose pushes do NOT trigger the push event above).
+  workflow_run:
+    workflows: ["prices", "flows"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:

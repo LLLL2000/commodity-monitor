@@ -23,12 +23,13 @@ jobs:
           COMTRADE_KEY: ${{ secrets.COMTRADE_KEY }}
           FLOWS_PERIOD: ${{ github.event.inputs.period }}
         run: python -m jobs.flows_job
-      - name: Commit if changed
+      - name: Publish to web/data + commit if changed
         run: |
           git config user.name "flows-bot"
           git config user.email "flows-bot@users.noreply.github.com"
-          if ! git diff --quiet -- data/flows.json; then
-            git add data/flows.json
+          cp data/flows.json web/data/flows.json
+          if ! git diff --quiet -- data/flows.json web/data/flows.json; then
+            git add data/flows.json web/data/flows.json
             git commit -m "flows: refresh $(date -u +%Y-%m-%d)"
             git push
           else
