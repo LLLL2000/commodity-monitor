@@ -1,0 +1,50 @@
+name: Deploy web console to GitHub Pages
+
+# Publishes the static Leaflet console (web/) to GitHub Pages. The page fetches
+# ./data/*.json at runtime and falls back to a baked-in seed, so it renders even
+# before the collector starts pushing fresh snapshots.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - "registry.json"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time; let a newer push supersede an in-flight run.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Bake current data + registry into index.html
+        run: python web/build.py
+      - name: Upload web/ as the Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
