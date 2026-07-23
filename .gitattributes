@@ -1,0 +1,6 @@
+# Normalize line endings to LF in the repo; check out native on each OS.
+* text=auto eol=lf
+
+# Windows-only scripts keep CRLF so they run correctly on the host PC.
+*.cmd text eol=crlf
+*.vbs text eol=crlf

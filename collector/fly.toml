@@ -1,0 +1,40 @@
+# Fly.io deploy for the always-on collector.
+# The collector holds the persistent AIS WebSocket and publishes state.json.
+# Deploy from repo root:  fly launch --dockerfile collector/Dockerfile
+app = "commodity-monitor-collector"
+primary_region = "scl"   # Santiago — close to the LatAm bbox / receivers
+
+[build]
+  dockerfile = "collector/Dockerfile"
+
+[env]
+  STATE_PATH = "/app/data/state.json"
+  DB_PATH = "/app/data/collector.db"
+  HTTP_PORT = "8080"
+
+# Persistent volume so the SQLite event log (and thus baselines) survive restarts.
+[mounts]
+  source = "cm_data"
+  destination = "/app/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+
+# One always-on machine holding the single persistent WS; never autostop to 0.
+# The collector's built-in HTTP publisher serves data/*.json + /healthz here, so
+# the frontend can poll it (set DATA_BASE to https://<app>.fly.dev) and Fly's
+# health check has a real endpoint to hit.
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = false
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "20s"
+    method = "GET"
+    path = "/healthz"

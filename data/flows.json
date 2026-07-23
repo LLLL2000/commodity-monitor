@@ -1,0 +1,61 @@
+{
+  "_note": "SAMPLE data illustrating the flows.json contract. Replace by running jobs/flows_job.py against UN Comtrade. Figures here are illustrative, not real.",
+  "updated": "2026-07-01T00:00:00Z",
+  "source": "SAMPLE (schema of UN Comtrade monthly exports)",
+  "period": "2026-05",
+  "lag_note": "Customs data typically lags 1-3 months; national sources (Cochilco/SUNAT) lead it.",
+  "flows": [
+    {
+      "country": "CL",
+      "commodity": "copper",
+      "hs_codes": ["2603", "7403"],
+      "period": "2026-05",
+      "tonnes": 471000,
+      "value_usd": 3960000000,
+      "source": "SAMPLE",
+      "destinations": [
+        {"partner": "CN", "tonnes": 231000, "share": 0.49},
+        {"partner": "JP", "tonnes": 61000, "share": 0.13},
+        {"partner": "KR", "tonnes": 47000, "share": 0.10},
+        {"partner": "IN", "tonnes": 33000, "share": 0.07},
+        {"partner": "other", "tonnes": 99000, "share": 0.21}
+      ]
+    },
+    {
+      "country": "PE",
+      "commodity": "copper",
+      "hs_codes": ["2603", "7403"],
+      "period": "2026-05",
+      "tonnes": 238000,
+      "value_usd": 1990000000,
+      "source": "SAMPLE",
+      "destinations": [
+        {"partner": "CN", "tonnes": 152000, "share": 0.64},
+        {"partner": "JP", "tonnes": 26000, "share": 0.11},
+        {"partner": "KR", "tonnes": 19000, "share": 0.08},
+        {"partner": "other", "tonnes": 41000, "share": 0.17}
+      ]
+    },
+    {
+      "country": "CL",
+      "commodity": "lithium",
+      "hs_codes": ["2836.91", "2825.20"],
+      "period": "2026-05",
+      "tonnes": 21500,
+      "value_usd": 305000000,
+      "source": "SAMPLE",
+      "destinations": [
+        {"partner": "CN", "tonnes": 12900, "share": 0.60},
+        {"partner": "KR", "tonnes": 4300, "share": 0.20},
+        {"partner": "JP", "tonnes": 2150, "share": 0.10},
+        {"partner": "other", "tonnes": 2150, "share": 0.10}
+      ]
+    }
+  ],
+  "trend": {
+    "CL_copper": [452000, 448000, 460000, 455000, 468000, 471000],
+    "PE_copper": [221000, 229000, 233000, 227000, 235000, 238000],
+    "CL_lithium": [19800, 20100, 20600, 21000, 21200, 21500],
+    "trend_periods": ["2025-12", "2026-01", "2026-02", "2026-03", "2026-04", "2026-05"]
+  }
+}

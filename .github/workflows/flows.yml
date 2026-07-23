@@ -1,0 +1,36 @@
+name: flows
+# Monthly structural-flow refresh from UN Comtrade -> data/flows.json
+on:
+  schedule:
+    - cron: "0 6 3 * *"   # 06:00 UTC on the 3rd of each month
+  workflow_dispatch:
+    inputs:
+      period:
+        description: "Comtrade period YYYYMM (blank = job default)"
+        required: false
+
+jobs:
+  flows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r jobs/requirements.txt
+      - name: Pull flows
+        env:
+          COMTRADE_KEY: ${{ secrets.COMTRADE_KEY }}
+          FLOWS_PERIOD: ${{ github.event.inputs.period }}
+        run: python -m jobs.flows_job
+      - name: Commit if changed
+        run: |
+          git config user.name "flows-bot"
+          git config user.email "flows-bot@users.noreply.github.com"
+          if ! git diff --quiet -- data/flows.json; then
+            git add data/flows.json
+            git commit -m "flows: refresh $(date -u +%Y-%m-%d)"
+            git push
+          else
+            echo "no change"
+          fi

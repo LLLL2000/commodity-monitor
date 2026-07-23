@@ -1,0 +1,2 @@
+requests>=2.31
+openpyxl>=3.1   # World Bank Pink Sheet XLSX parsing in prices_job.fetch_copper

@@ -1,0 +1,755 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Seaborne · Commodity Activity Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+<!-- Leaflet is self-hosted (web/vendor/leaflet) so the page never depends on a CDN
+     or a Subresource-Integrity hash that can drift and silently block the script. -->
+<link rel="stylesheet" href="./vendor/leaflet/leaflet.min.css" />
+<script src="./vendor/leaflet/leaflet.min.js"></script>
+<style>
+:root{
+  --ink:#0B2530; --rail:#0E2A33; --rail-2:#12333D; --rail-3:#164049;
+  --paper:#EDF1F0; --surface:#F6F8F7; --parchment:#E7EEF0;
+  --muted:#8AA3AB; --muted-2:#6E8990; --line:rgba(11,37,48,.14); --line-dk:rgba(231,238,240,.12);
+  --magenta:#B5197A; --magenta-soft:rgba(181,25,122,.16);
+  --up:#2E7D74; --down:#C05A2B;
+  --cargo:#2A4E86; --tanker:#C1622D; --passenger:#2E7D74; --fishing:#9AA0A6; --other:#6B7A82;
+  --sans:"IBM Plex Sans",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+  --disp:"Saira Condensed","Arial Narrow",sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:var(--mono); font-size:13px; line-height:1.4;
+  -webkit-font-smoothing:antialiased; overflow:hidden;
+}
+button{font:inherit;color:inherit;cursor:pointer;border:none;background:none}
+:focus-visible{outline:2px solid var(--magenta);outline-offset:2px;border-radius:2px}
+
+/* ---------- shell ---------- */
+.app{display:grid;grid-template-columns:322px 1fr;height:100vh;height:100dvh}
+.map{position:relative;height:100%;background:#dfe6e5}
+#map{position:absolute;inset:0}
+
+/* ---------- rail ---------- */
+.rail{
+  background:linear-gradient(180deg,#123540 0%, var(--rail) 42%, #0B2229 100%);
+  color:var(--parchment); display:flex;flex-direction:column;
+  border-right:1px solid rgba(0,0,0,.35); z-index:500; overflow:hidden;
+}
+.rail__scroll{overflow-y:auto;overflow-x:hidden;flex:1;padding:18px 18px 22px}
+.rail__scroll::-webkit-scrollbar{width:8px}
+.rail__scroll::-webkit-scrollbar-thumb{background:var(--rail-3);border-radius:4px}
+
+.brand{display:flex;flex-direction:column;gap:2px;padding-bottom:14px;border-bottom:1px solid var(--line-dk)}
+.brand__mark{font-family:var(--disp);font-weight:700;font-size:27px;letter-spacing:.16em;line-height:.95;color:#fff}
+.brand__sub{font-family:var(--disp);font-weight:500;letter-spacing:.34em;text-transform:uppercase;font-size:10.5px;color:var(--muted)}
+
+.status{display:flex;align-items:center;gap:9px;margin-top:13px;font-size:11px;letter-spacing:.04em}
+.pip{width:8px;height:8px;border-radius:50%;background:var(--up);box-shadow:0 0 0 0 rgba(46,125,116,.6);flex:none}
+.pip.live{animation:pip 2.6s ease-out infinite}
+.pip.stale{background:var(--down);animation:none}
+@keyframes pip{0%{box-shadow:0 0 0 0 rgba(46,125,116,.55)}70%{box-shadow:0 0 0 7px rgba(46,125,116,0)}100%{box-shadow:0 0 0 0 rgba(46,125,116,0)}}
+.status b{color:var(--parchment);font-weight:600}
+.status .sep{color:var(--muted-2)}
+
+.proxy{margin-top:12px;padding:8px 10px;border:1px solid var(--line-dk);border-left:2px solid var(--magenta);
+  border-radius:3px;background:rgba(181,25,122,.08);font-size:10.5px;color:#E9C7DC;letter-spacing:.02em}
+
+.sect{margin-top:22px}
+.sect__hd{font-family:var(--disp);font-weight:600;letter-spacing:.24em;text-transform:uppercase;font-size:11px;color:var(--muted);
+  display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:10px}
+.sect__hd em{font-style:normal;color:var(--muted-2);font-size:10px;letter-spacing:.08em}
+
+/* commodity chips */
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{padding:5px 11px;border:1px solid var(--line-dk);border-radius:999px;background:rgba(255,255,255,.03);
+  color:var(--parchment);font-size:11.5px;letter-spacing:.04em;text-transform:capitalize;transition:.15s;display:flex;align-items:center;gap:7px}
+.chip:hover{border-color:var(--muted-2)}
+.chip .dot{width:8px;height:8px;border-radius:2px;flex:none;opacity:.9}
+.chip[aria-pressed="true"]{background:#fff;color:var(--ink);border-color:#fff;font-weight:500}
+.chip__all{text-transform:none}
+
+/* price cards */
+.price{border:1px solid var(--line-dk);border-radius:5px;padding:10px 11px;margin-bottom:8px;background:rgba(255,255,255,.02)}
+.price__top{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.price__name{font-family:var(--disp);font-weight:600;letter-spacing:.14em;text-transform:uppercase;font-size:12px}
+.price__tag{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#E9C7DC;border:1px solid var(--magenta-soft);
+  background:rgba(181,25,122,.1);padding:1px 6px;border-radius:999px}
+.price__val{font-size:21px;font-weight:600;letter-spacing:.01em;margin-top:4px;color:#fff}
+.price__unit{font-size:10px;color:var(--muted-2);letter-spacing:.02em}
+.price__row{display:flex;align-items:center;justify-content:space-between;margin-top:5px;gap:8px}
+.chg{font-weight:600;font-size:11.5px}
+.chg.up{color:var(--up)} .chg.down{color:var(--down)}
+.spark{display:block;width:100%;height:26px;margin-top:7px}
+.stock{font-size:10px;color:var(--muted);margin-top:6px;letter-spacing:.01em}
+
+/* flows */
+.flow{border-top:1px solid var(--line-dk);padding:9px 0}
+.flow:first-child{border-top:none}
+.flow__hd{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.flow__name{letter-spacing:.03em}
+.flow__name b{font-family:var(--disp);font-weight:600;letter-spacing:.1em;text-transform:uppercase}
+.flow__vol{color:#fff;font-weight:600}
+.flow__dest{font-size:10.5px;color:var(--muted);margin-top:3px;letter-spacing:.02em}
+.flow__spark{display:block;width:100%;height:22px;margin-top:5px}
+
+.rail__foot{padding:12px 18px;border-top:1px solid var(--line-dk);font-size:10px;color:var(--muted-2);letter-spacing:.03em;
+  display:flex;align-items:center;justify-content:space-between;gap:10px}
+.rail__foot a{color:var(--muted);text-decoration:none;border-bottom:1px dotted var(--muted-2)}
+
+/* ---------- map furniture ---------- */
+.map__top{position:absolute;top:12px;right:12px;z-index:600;display:flex;gap:8px}
+.mbtn{background:rgba(14,42,51,.92);color:var(--parchment);border:1px solid var(--line-dk);border-radius:4px;
+  padding:8px 12px;font-family:var(--disp);font-weight:600;letter-spacing:.16em;text-transform:uppercase;font-size:11px;
+  backdrop-filter:blur(6px);box-shadow:0 2px 10px rgba(11,37,48,.25)}
+.mbtn:hover{background:var(--rail-3)}
+
+.legend{position:absolute;left:12px;bottom:12px;z-index:600;background:rgba(246,248,247,.94);border:1px solid var(--line);
+  border-radius:6px;padding:11px 13px;backdrop-filter:blur(6px);box-shadow:0 3px 14px rgba(11,37,48,.16);max-width:236px}
+.legend__hd{font-family:var(--disp);font-weight:600;letter-spacing:.18em;text-transform:uppercase;font-size:10.5px;color:var(--muted-2);margin-bottom:8px;
+  display:flex;justify-content:space-between;gap:8px}
+.legend__hd span{color:var(--ink)}
+.ramp{height:9px;border-radius:2px;background:linear-gradient(90deg,#5E8F84,#B9B36A,#E1A24B,#B5197A)}
+.ramp__lab{display:flex;justify-content:space-between;font-size:9.5px;color:var(--muted-2);margin-top:3px;letter-spacing:.03em}
+.legend__row{display:flex;align-items:center;gap:7px;margin-top:7px;font-size:10.5px;color:var(--ink);letter-spacing:.01em}
+.legend__row .sw{width:11px;height:11px;border-radius:50%;flex:none;border:1.5px solid rgba(255,255,255,.6)}
+.legend__row .ring{width:13px;height:13px;border-radius:50%;flex:none;border:1.6px solid var(--magenta)}
+.legend__row .ring.dash{border-style:dashed}
+.legend__note{font-size:9.5px;color:var(--muted-2);margin-top:9px;line-height:1.35}
+.legend__commodities{display:none;flex-direction:column;gap:2px}
+
+/* terminal markers */
+.tmark{position:relative;display:grid;place-items:center}
+.tmark .core{border-radius:50%;border:1.6px solid rgba(255,255,255,.85);box-shadow:0 1px 4px rgba(11,37,48,.4);transition:transform .15s}
+.tmark:hover .core{transform:scale(1.18)}
+.tmark .ring{position:absolute;border-radius:50%;border:1.6px solid var(--magenta);pointer-events:none}
+.tmark.armed .ring{box-shadow:0 0 10px 1px var(--magenta-soft)}
+.tmark.elevated .ring{border-style:dashed}
+.tmark.elevated .ring,.tmark.armed .ring{animation:ping 3.4s ease-out infinite}
+.tmark.sel .core{box-shadow:0 0 0 3px rgba(181,25,122,.35),0 1px 4px rgba(11,37,48,.5)}
+@keyframes ping{0%{transform:scale(.55);opacity:.9}70%{transform:scale(1.35);opacity:0}100%{transform:scale(1.35);opacity:0}}
+@media (prefers-reduced-motion:reduce){
+  .tmark .ring{animation:none!important;transform:none;opacity:.85}
+  .pip.live{animation:none}
+}
+
+/* leaflet tooltip restyle */
+.leaflet-tooltip.tt{background:var(--rail);color:var(--parchment);border:1px solid var(--line-dk);border-radius:4px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.02em;box-shadow:0 3px 10px rgba(11,37,48,.35);padding:5px 8px}
+.leaflet-tooltip.tt::before{display:none}
+.tt b{font-family:var(--disp);letter-spacing:.08em;text-transform:uppercase;font-weight:600;color:#fff}
+.tt .z{color:var(--magenta)}
+.leaflet-container{background:#dfe6e5;font-family:var(--mono)}
+.leaflet-control-attribution{font-family:var(--sans);font-size:9px!important}
+
+/* ---------- side panel ---------- */
+.panel{position:absolute;top:0;right:0;height:100%;width:372px;max-width:92vw;z-index:700;
+  background:linear-gradient(180deg,#123540,#0C2831);color:var(--parchment);
+  border-left:1px solid rgba(0,0,0,.4);box-shadow:-8px 0 30px rgba(11,37,48,.3);
+  transform:translateX(102%);transition:transform .28s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column}
+.panel.open{transform:translateX(0)}
+@media (prefers-reduced-motion:reduce){.panel{transition:none}}
+.panel__hd{padding:16px 18px 14px;border-bottom:1px solid var(--line-dk);position:relative}
+.panel__close{position:absolute;top:12px;right:12px;width:30px;height:30px;border-radius:4px;color:var(--muted);
+  border:1px solid var(--line-dk);display:grid;place-items:center;font-size:16px;line-height:1}
+.panel__close:hover{color:#fff;background:var(--rail-3)}
+.panel__name{font-family:var(--disp);font-weight:700;font-size:23px;letter-spacing:.05em;line-height:1;color:#fff;padding-right:34px}
+.panel__loc{color:var(--muted);font-size:11px;letter-spacing:.05em;margin-top:5px}
+.badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px}
+.badge{font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:999px;border:1px solid var(--line-dk);color:var(--parchment)}
+.badge.commodity{background:rgba(255,255,255,.06)}
+.badge.pur-high{border-color:rgba(46,125,116,.5);color:#8fd6cb;background:rgba(46,125,116,.12)}
+.badge.pur-medium{border-color:rgba(225,162,75,.45);color:#eec38a;background:rgba(225,162,75,.1)}
+.badge.pur-low{border-color:rgba(176,90,43,.5);color:#e7ad86;background:rgba(176,90,43,.12)}
+.badge.verified{border-color:rgba(46,125,116,.5);color:#8fd6cb}
+.badge.unverified{border-color:var(--magenta-soft);color:#E9A9CE;background:rgba(181,25,122,.08)}
+
+.panel__scroll{overflow-y:auto;padding:16px 18px 22px;flex:1}
+.panel__scroll::-webkit-scrollbar{width:8px}
+.panel__scroll::-webkit-scrollbar-thumb{background:var(--rail-3);border-radius:4px}
+
+.attn{border:1px solid var(--magenta-soft);background:rgba(181,25,122,.1);border-radius:5px;padding:9px 11px;margin-bottom:14px;
+  font-size:11px;color:#F0CFE1;letter-spacing:.02em}
+.attn b{color:#fff;font-family:var(--disp);letter-spacing:.06em;text-transform:uppercase}
+
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line-dk);border:1px solid var(--line-dk);border-radius:5px;overflow:hidden}
+.metric{background:#0F2E37;padding:10px 11px}
+.metric__k{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.metric__v{font-size:19px;font-weight:600;color:#fff;margin-top:3px;letter-spacing:.01em}
+.metric__v small{font-size:10px;color:var(--muted-2);font-weight:400;letter-spacing:.02em}
+.metric.hl .metric__v{color:#E9A9CE}
+
+.blk{margin-top:18px}
+.blk__hd{font-family:var(--disp);font-weight:600;letter-spacing:.2em;text-transform:uppercase;font-size:10.5px;color:var(--muted);margin-bottom:9px;
+  display:flex;justify-content:space-between;gap:8px}
+.blk__hd em{font-style:normal;color:var(--muted-2);font-size:10px;letter-spacing:.05em}
+.panelspark{display:block;width:100%;height:46px}
+
+.dest{display:flex;align-items:center;gap:9px;margin-top:7px;font-size:11px}
+.dest__p{width:34px;color:var(--parchment);letter-spacing:.05em;flex:none}
+.dest__bar{flex:1;height:8px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden}
+.dest__fill{height:100%;background:linear-gradient(90deg,#2E7D74,#5E8F84);border-radius:2px}
+.dest__v{width:52px;text-align:right;color:var(--muted);flex:none;font-size:10.5px}
+.customs{margin-top:10px;font-size:11px;color:var(--parchment);letter-spacing:.02em}
+.customs b{color:#fff}
+.customs .muted{color:var(--muted-2)}
+
+.notes{margin-top:16px;font-family:var(--sans);font-size:11.5px;line-height:1.5;color:#C7D6DB;
+  border-top:1px solid var(--line-dk);padding-top:13px}
+
+/* ---------- methodology overlay ---------- */
+.sheet{position:fixed;inset:0;z-index:900;background:rgba(9,26,32,.62);backdrop-filter:blur(3px);
+  display:none;align-items:center;justify-content:center;padding:24px}
+.sheet.open{display:flex}
+.sheet__card{width:min(680px,100%);max-height:86vh;overflow:auto;background:linear-gradient(180deg,#123540,#0C2831);
+  color:var(--parchment);border:1px solid var(--line-dk);border-radius:9px;box-shadow:0 18px 60px rgba(0,0,0,.5)}
+.sheet__hd{position:sticky;top:0;background:#123540;padding:18px 22px;border-bottom:1px solid var(--line-dk);
+  display:flex;align-items:center;justify-content:space-between;gap:12px}
+.sheet__hd h2{margin:0;font-family:var(--disp);font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:18px;color:#fff}
+.sheet__body{padding:20px 22px 26px}
+.sheet__body p{font-family:var(--sans);font-size:13px;line-height:1.6;color:#CBD9DE}
+.sheet__body .lead{color:#E7EEF0}
+.cav{border-left:2px solid var(--magenta);padding:2px 0 2px 13px;margin:14px 0}
+.cav h3{margin:0 0 3px;font-family:var(--disp);font-weight:600;letter-spacing:.1em;text-transform:uppercase;font-size:12.5px;color:#fff}
+.cav p{margin:0}
+.formula{font-family:var(--mono);font-size:12px;background:rgba(255,255,255,.05);border:1px solid var(--line-dk);
+  border-radius:5px;padding:11px 13px;margin-top:14px;color:#DCE8EB;letter-spacing:.01em;line-height:1.7}
+.sources{font-family:var(--sans);font-size:11.5px;color:var(--muted);margin-top:16px;border-top:1px solid var(--line-dk);padding-top:12px}
+
+/* ---------- empty / error toast ---------- */
+.toast{position:absolute;left:50%;top:16px;transform:translateX(-50%);z-index:650;background:var(--rail);color:var(--parchment);
+  border:1px solid var(--line-dk);border-left:2px solid var(--down);border-radius:5px;padding:9px 14px;font-size:11.5px;
+  letter-spacing:.02em;box-shadow:0 4px 16px rgba(11,37,48,.3);display:none;max-width:min(520px,90vw)}
+.toast.show{display:block}
+
+/* ---------- responsive ---------- */
+.rail__toggle{display:none}
+@media (max-width:880px){
+  body{overflow:auto}
+  .app{grid-template-columns:1fr;height:auto;min-height:100dvh}
+  .map{height:64vh;height:64dvh;order:-1}
+  .rail{max-height:none}
+  .rail__scroll{padding:16px}
+  .panel{width:100%;max-width:100%;top:auto;bottom:0;height:80vh;height:80dvh;transform:translateY(102%);border-left:none;border-top:1px solid rgba(0,0,0,.4)}
+  .panel.open{transform:translateY(0)}
+  .legend{max-width:200px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- RAIL -->
+  <aside class="rail">
+    <div class="rail__scroll">
+      <div class="brand">
+        <div class="brand__mark">SEABORNE</div>
+        <div class="brand__sub">Commodity Activity Monitor</div>
+      </div>
+
+      <div class="status">
+        <span class="pip live" id="pip"></span>
+        <span id="feedmode"><b>—</b></span>
+        <span class="sep">·</span>
+        <span id="updated">connecting…</span>
+      </div>
+      <div class="status" style="margin-top:6px">
+        <span style="width:8px"></span>
+        <span><b id="vcount">0</b> vessels tracked</span>
+      </div>
+
+      <div class="proxy">Activity <b style="color:#fff">proxy</b> — a signal of port calls, <b style="color:#fff">not verified tonnage</b>. See methodology.</div>
+
+      <div class="sect">
+        <div class="sect__hd">Commodity</div>
+        <div class="chips" id="chips"></div>
+      </div>
+
+      <div class="sect">
+        <div class="sect__hd">Prices <em id="priceAsof"></em></div>
+        <div id="prices"></div>
+      </div>
+
+      <div class="sect">
+        <div class="sect__hd">Customs flows <em id="flowsPeriod"></em></div>
+        <div id="flows"></div>
+      </div>
+    </div>
+    <div class="rail__foot">
+      <span>Free AIS + berth registry</span>
+      <button class="rail__foot-btn" id="methodLink" style="border-bottom:1px dotted var(--muted-2);color:var(--muted)">Methodology</button>
+    </div>
+  </aside>
+
+  <!-- MAP -->
+  <div class="map">
+    <div id="map"></div>
+    <div class="map__top">
+      <button class="mbtn" id="methodBtn">Methodology</button>
+    </div>
+    <div class="toast" id="toast"></div>
+
+    <div class="legend" id="legend">
+      <div class="legend__hd"><span>Colour</span> <span id="legendMode">by activity index</span></div>
+      <div id="legendActivity">
+        <div class="ramp"></div>
+        <div class="ramp__lab"><span>quiet</span><span>normal</span><span>elevated</span></div>
+      </div>
+      <div class="legend__commodities" id="legendCommodities"></div>
+      <div class="legend__row"><span class="ring dash"></span> elevated (z ≥ 2, awaiting berth check)</div>
+      <div class="legend__row"><span class="ring"></span> armed anomaly (verified berth)</div>
+      <div style="height:6px"></div>
+      <div class="legend__row"><span class="sw" style="background:var(--cargo)"></span> cargo &nbsp;<span class="sw" style="background:var(--tanker)"></span> tanker &nbsp;<span class="sw" style="background:var(--other)"></span> other</div>
+      <div class="legend__note" id="legendNote">Marker size ≈ activity. Vessel dots poll live from AIS.</div>
+    </div>
+
+    <!-- SIDE PANEL -->
+    <aside class="panel" id="panel" aria-hidden="true">
+      <div class="panel__hd">
+        <button class="panel__close" id="panelClose" aria-label="Close panel">✕</button>
+        <div class="panel__name" id="pName">—</div>
+        <div class="panel__loc" id="pLoc"></div>
+        <div class="badges" id="pBadges"></div>
+      </div>
+      <div class="panel__scroll" id="pBody"></div>
+    </aside>
+  </div>
+</div>
+
+<!-- METHODOLOGY -->
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+  <div class="sheet__card">
+    <div class="sheet__hd">
+      <h2 id="sheetTitle">How to read this</h2>
+      <button class="panel__close" id="sheetClose" aria-label="Close">✕</button>
+    </div>
+    <div class="sheet__body">
+      <p class="lead">This tool infers seaborne commodity activity by watching where ships stop. A vessel that berths at a single-purpose terminal is counted as a port call for that terminal's commodity. It measures <b style="color:#fff">activity</b>, and pairs it with customs data for tonnage.</p>
+
+      <div class="formula">
+        activity index = departures (7d) ÷ median weekly departures (12-week baseline)<br>
+        z-score = (departures 7d − baseline mean) ÷ baseline std. dev.<br>
+        A terminal flags when |z| ≥ 2 — unusually busy or quiet versus its own norm.
+      </div>
+
+      <div class="cav"><h3>Activity is a proxy, not verified tonnage</h3><p>Concentrate, cathode, and dedicated tanker or gas flows give a strong live signal. Containerised commodities such as lithium chemicals do not — those lean on customs data instead.</p></div>
+      <div class="cav"><h3>Customs data lags 1–3 months</h3><p>National sources (Cochilco, SUNAT) lead the picture for the home market; UN Comtrade follows.</p></div>
+      <div class="cav"><h3>AIS coverage is uneven</h3><p>Good near coasts and receivers, with gaps offshore. Transponders can be switched off, so absence of a signal is not absence of a ship.</p></div>
+      <div class="cav"><h3>Berth purity matters</h3><p>Trust high-purity, single-source terminals. Treat general multi-commodity ports as noisy unless activity is tagged at the berth level.</p></div>
+      <div class="cav"><h3>Lithium prices are indicative</h3><p>There is no clean free real-time reference price for lithium; the benchmark indices are paid. Read the lithium figure as directional only.</p></div>
+      <div class="cav"><h3>Alerts wait for a verified berth</h3><p>A terminal can read as elevated (dashed ring) while its berth polygon is still an approximate placeholder. Email alerts arm only once the polygon is checked against a marine chart — until then the map flags the signal but holds the alert.</p></div>
+
+      <div class="sources">Sources — positions: AISStream.io · customs: UN Comtrade · prices &amp; stocks: LME / World Bank / GFEX · basemap: CARTO / OpenStreetMap. Coverage grows by adding terminals to the berth registry.</div>
+    </div>
+  </div>
+</div>
+
+<script id="seed-state" type="application/json">{"updated":"2026-07-16T02:21:43.352245+00:00","vessel_count":2,"anomalies":[],"vessels":[{"mmsi":311000222,"name":"SIM QUEUE 0","lat":-20.76,"lon":-70.12,"class":"cargo","sog":0.0,"near":"patache","at_berth":false},{"mmsi":311000333,"name":"SIM QUEUE 1","lat":-20.755,"lon":-70.12,"class":"cargo","sog":0.0,"near":"patache","at_berth":false}],"terminals":{"coloso":{"commodity":"copper","purity":"high","polygon_verified":false,"at_berth":0,"queue":0,"arrivals_7d":5,"arrivals_30d":24,"departures_7d":8,"departures_30d":24,"median_dwell_h":27.9,"activity_index":2.67,"z":1.72,"anomaly":false,"sparkline":[0,0,0,0,1,0,2,2,0,1,0,0,1,0,0,1,3,0,0,0,0,4,4,0,1,2,0,1,1,0]},"patache":{"commodity":"copper","purity":"high","polygon_verified":false,"at_berth":0,"queue":2,"arrivals_7d":1,"arrivals_30d":15,"departures_7d":3,"departures_30d":15,"median_dwell_h":25.3,"activity_index":0.86,"z":-0.57,"anomaly":false,"sparkline":[1,3,0,0,1,0,0,0,0,0,1,1,1,1,1,0,2,0,0,0,0,0,2,0,0,1,0,0,0,0]},"mejillones":{"commodity":"copper","purity":"medium","polygon_verified":false,"at_berth":0,"queue":0,"arrivals_7d":4,"arrivals_30d":22,"departures_7d":4,"departures_30d":23,"median_dwell_h":26.5,"activity_index":0.73,"z":-0.8,"anomaly":false,"sparkline":[1,1,2,1,0,0,0,0,3,1,0,2,2,0,0,0,2,0,0,1,0,2,1,2,1,0,1,0,0,0]},"antofagasta":{"commodity":"copper","purity":"medium","polygon_verified":false,"at_berth":0,"queue":0,"arrivals_7d":1,"arrivals_30d":21,"departures_7d":2,"departures_30d":23,"median_dwell_h":29.1,"activity_index":0.33,"z":-2.56,"anomaly":false,"sparkline":[2,1,1,0,1,1,0,0,2,0,1,0,1,0,2,1,1,1,2,1,1,1,0,2,0,0,0,0,0,0]},"ventanas":{"commodity":"copper","purity":"medium","polygon_verified":false,"at_berth":0,"queue":0,"arrivals_7d":4,"arrivals_30d":22,"departures_7d":6,"departures_30d":22,"median_dwell_h":29.6,"activity_index":1.2,"z":0.12,"anomaly":false,"sparkline":[1,0,0,1,1,1,0,0,1,1,1,3,0,0,1,3,1,0,0,0,1,0,1,3,1,0,0,1,0,0]},"sanantonio":{"commodity":"copper","purity":"low","polygon_verified":false,"at_berth":0,"queue":0,"arrivals_7d":5,"arrivals_30d":36,"departures_7d":7,"departures_30d":36,"median_dwell_h":30.2,"activity_index":0.78,"z":-0.81,"anomaly":false,"sparkline":[0,3,0,1,1,2,1,1,0,3,3,2,0,1,1,1,0,4,1,0,3,1,1,1,2,1,2,0,0,0]},"matarani":{"commodity":"copper","purity":"high","polygon_verified":false,"at_berth":0,"queue":0,"arrivals_7d":2,"arrivals_30d":15,"departures_7d":3,"departures_30d":15,"median_dwell_h":26.8,"activity_index":0.75,"z":-0.55,"anomaly":false,"sparkline":[2,0,1,0,0,1,0,1,0,0,1,0,1,1,0,0,0,2,0,1,0,1,0,2,0,0,1,0,0,0]},"puntalobitos":{"commodity":"copper","purity":"high","polygon_verified":false,"at_berth":0,"queue":0,"arrivals_7d":2,"arrivals_30d":14,"departures_7d":2,"departures_30d":14,"median_dwell_h":31.2,"activity_index":0.57,"z":-1.06,"anomaly":false,"sparkline":[0,1,1,1,0,0,0,1,1,2,0,0,1,0,0,0,0,0,0,3,0,0,1,1,1,0,0,0,0,0]},"ilo":{"commodity":"copper","purity":"medium","polygon_verified":false,"at_berth":0,"queue":0,"arrivals_7d":3,"arrivals_30d":19,"departures_7d":5,"departures_30d":20,"median_dwell_h":26.3,"activity_index":1.0,"z":-0.19,"anomaly":false,"sparkline":[1,1,0,1,0,1,1,0,0,1,1,1,0,1,3,0,0,0,2,0,0,0,1,1,2,1,0,0,0,0]},"callao":{"commodity":"copper","purity":"low","polygon_verified":false,"at_berth":0,"queue":0,"arrivals_7d":5,"arrivals_30d":21,"departures_7d":6,"departures_30d":23,"median_dwell_h":31.5,"activity_index":0.86,"z":-0.6,"anomaly":false,"sparkline":[2,2,1,1,1,1,1,0,0,0,2,0,0,1,0,0,0,2,2,0,0,1,0,2,1,2,1,0,0,0]}}}</script>
+<script id="seed-flows" type="application/json">{"_note":"SAMPLE data illustrating the flows.json contract. Replace by running jobs/flows_job.py against UN Comtrade. Figures here are illustrative, not real.","updated":"2026-07-01T00:00:00Z","source":"SAMPLE (schema of UN Comtrade monthly exports)","period":"2026-05","lag_note":"Customs data typically lags 1-3 months; national sources (Cochilco/SUNAT) lead it.","flows":[{"country":"CL","commodity":"copper","hs_codes":["2603","7403"],"period":"2026-05","tonnes":471000,"value_usd":3960000000,"source":"SAMPLE","destinations":[{"partner":"CN","tonnes":231000,"share":0.49},{"partner":"JP","tonnes":61000,"share":0.13},{"partner":"KR","tonnes":47000,"share":0.1},{"partner":"IN","tonnes":33000,"share":0.07},{"partner":"other","tonnes":99000,"share":0.21}]},{"country":"PE","commodity":"copper","hs_codes":["2603","7403"],"period":"2026-05","tonnes":238000,"value_usd":1990000000,"source":"SAMPLE","destinations":[{"partner":"CN","tonnes":152000,"share":0.64},{"partner":"JP","tonnes":26000,"share":0.11},{"partner":"KR","tonnes":19000,"share":0.08},{"partner":"other","tonnes":41000,"share":0.17}]},{"country":"CL","commodity":"lithium","hs_codes":["2836.91","2825.20"],"period":"2026-05","tonnes":21500,"value_usd":305000000,"source":"SAMPLE","destinations":[{"partner":"CN","tonnes":12900,"share":0.6},{"partner":"KR","tonnes":4300,"share":0.2},{"partner":"JP","tonnes":2150,"share":0.1},{"partner":"other","tonnes":2150,"share":0.1}]}],"trend":{"CL_copper":[452000,448000,460000,455000,468000,471000],"PE_copper":[221000,229000,233000,227000,235000,238000],"CL_lithium":[19800,20100,20600,21000,21200,21500],"trend_periods":["2025-12","2026-01","2026-02","2026-03","2026-04","2026-05"]}}</script>
+<script id="seed-prices" type="application/json">{"updated":"2026-07-16T00:20:18Z","prices":{"copper":{"price":11785,"unit":"USD/tonne","change":9.0,"asof":"2025-12","source":"World Bank Pink Sheet (monthly average, USD/mt)","history":[8991.41,9330.6,9739.68,9176.8,9532.98,9835.07,9770.58,9669.56,9983.79,10739.91,10812.03,11785.25],"history_dates":["2025-01","2025-02","2025-03","2025-04","2025-05","2025-06","2025-07","2025-08","2025-09","2025-10","2025-11","2025-12"]},"lithium":{"price":74500,"unit":"CNY/tonne (lithium carbonate)","change":1.2,"asof":"2026-07-11","source":"SAMPLE (schema of GFEX lithium-carbonate futures)","coverage_warning":"No clean free real-time reference price; benchmark indices (Fastmarkets, BMI) are paid. Treat as indicative only.","history":[71200,71800,72500,73100,73400,73900,73600,74500],"history_dates":["2026-07-02","2026-07-03","2026-07-04","2026-07-07","2026-07-08","2026-07-09","2026-07-10","2026-07-11"]}}}</script>
+<script id="seed-registry" type="application/json">{"_readme":"Berth registry = the heart of the system. Add coverage by adding terminals (and, if needed, taxonomy strings) here ONLY. Never hardcode commodities/terminals in code. berth_polygon are FIRST-PASS ~2 km boxes and MUST be verified/redrawn (set polygon_verified:true) before trusting high-purity alerts.","version":1,"country_meta":{"CL":{"name":"Chile","comtrade_reporter":"152"},"PE":{"name":"Peru","comtrade_reporter":"604"},"AR":{"name":"Argentina","comtrade_reporter":"032"},"AO":{"name":"Angola","comtrade_reporter":"024"}},"commodity_taxonomy":{"energy":["crude","products","lng","lpg","ammonia","coal"],"metals":["copper","iron_ore","bauxite","alumina","lithium","zinc"],"ags":["grain","soybeans","corn","sugar","palm_oil"]},"_hs_commodity_readme":"HS code -> commodity for customs attribution (flows_job). Copper headings (2603 ore, 7403 refined) auto-derive from copper-only terminals; lithium subheadings are listed explicitly because they only appear on dual-commodity berths. Add an entry here when a new HS code is introduced on a multi-commodity terminal.","hs_commodity":{"2603":"copper","7403":"copper","2836.91":"lithium","2825.20":"lithium"},"vessel_class_hint":{"tanker":["crude","products","palm_oil"],"gas_carrier":["lng","lpg","ammonia"],"bulk_carrier":["iron_ore","coal","bauxite","alumina","grain","soybeans","corn","copper","zinc"],"container":["lithium","products"]},"terminals":[{"id":"coloso","name":"Puerto Coloso","port":"Antofagasta","country":"CL","operator":"Escondida (BHP)","primary_commodity":"copper","commodities":["copper"],"hs_codes":["2603"],"purity":"high","expected_vessel_classes":["bulk_carrier","general_cargo"],"centroid":[-23.75,-70.47],"berth_polygon":[[-23.75901,-70.47984],[-23.74099,-70.47984],[-23.74099,-70.46016],[-23.75901,-70.46016]],"anchorage_radius_km":15,"notes":"Single-mine slurry-pipeline terminal; a bulk carrier here \u00e2\u2030\u02c6 Escondida copper concentrate.","polygon_verified":false,"source":"public"},{"id":"patache","name":"Punta Patache / Patillos","port":"Iquique","country":"CL","operator":"Collahuasi","primary_commodity":"copper","commodities":["copper"],"hs_codes":["2603"],"purity":"high","expected_vessel_classes":["bulk_carrier","general_cargo"],"centroid":[-20.8,-70.16],"berth_polygon":[[-20.80901,-70.16964],[-20.79099,-70.16964],[-20.79099,-70.15036],[-20.80901,-70.15036]],"anchorage_radius_km":15,"notes":"Dedicated Collahuasi concentrate terminal; high-confidence copper signal.","polygon_verified":false,"source":"public"},{"id":"mejillones","name":"Mejillones (Angamos / TGN)","port":"Mejillones","country":"CL","operator":"Codelco / multi","primary_commodity":"copper","commodities":["copper","lithium"],"hs_codes":["2603","7403","2836.91"],"purity":"medium","expected_vessel_classes":["bulk_carrier","general_cargo","container"],"centroid":[-23.1,-70.45],"berth_polygon":[[-23.10901,-70.45979],[-23.09099,-70.45979],[-23.09099,-70.44021],[-23.10901,-70.44021]],"anchorage_radius_km":15,"notes":"Multi-operator complex; copper cathode/concentrate + some lithium. Tag at berth level to lift purity.","polygon_verified":false,"source":"public"},{"id":"antofagasta","name":"Antofagasta (ATI)","port":"Antofagasta","country":"CL","operator":"Codelco / SQM","primary_commodity":"copper","commodities":["copper","lithium"],"hs_codes":["7403","2603","2836.91","2825.20"],"purity":"medium","expected_vessel_classes":["general_cargo","container","bulk_carrier"],"centroid":[-23.64,-70.4],"berth_polygon":[[-23.64901,-70.40983],[-23.63099,-70.40983],[-23.63099,-70.39017],[-23.64901,-70.39017]],"anchorage_radius_km":12,"notes":"City port handling Codelco copper + SQM lithium chemicals (largely containerised). Mixed signal.","polygon_verified":false,"source":"public"},{"id":"ventanas","name":"Ventanas (Quintero)","port":"Quintero","country":"CL","operator":"Codelco refinery","primary_commodity":"copper","commodities":["copper"],"hs_codes":["7403"],"purity":"medium","expected_vessel_classes":["general_cargo","container","bulk_carrier"],"centroid":[-32.75,-71.48],"berth_polygon":[[-32.75901,-71.49071],[-32.74099,-71.49071],[-32.74099,-71.46929],[-32.75901,-71.46929]],"anchorage_radius_km":12,"notes":"Codelco refinery outlet; refined cathodes (7403), some break-bulk/container.","polygon_verified":false,"source":"public"},{"id":"sanantonio","name":"San Antonio","port":"San Antonio","country":"CL","operator":"Andina / El Teniente (multi)","primary_commodity":"copper","commodities":["copper"],"hs_codes":["7403","2603"],"purity":"low","expected_vessel_classes":["container","general_cargo","bulk_carrier"],"centroid":[-33.59,-71.61],"berth_polygon":[[-33.59901,-71.62081],[-33.58099,-71.62081],[-33.58099,-71.59919],[-33.59901,-71.59919]],"anchorage_radius_km":12,"notes":"Large multi-commodity gateway. NOISY for copper unless tagged at berth level.","polygon_verified":false,"source":"public"},{"id":"matarani","name":"Matarani (TISUR)","port":"Matarani","country":"PE","operator":"Cerro Verde, Las Bambas","primary_commodity":"copper","commodities":["copper"],"hs_codes":["2603"],"purity":"high","expected_vessel_classes":["bulk_carrier","general_cargo"],"centroid":[-17.0,-72.1],"berth_polygon":[[-17.00901,-72.10942],[-16.99099,-72.10942],[-16.99099,-72.09058],[-17.00901,-72.09058]],"anchorage_radius_km":15,"notes":"Concentrate outlet for Cerro Verde & Las Bambas; strong copper signal.","polygon_verified":false,"source":"public"},{"id":"puntalobitos","name":"Punta Lobitos (Huarmey)","port":"Huarmey","country":"PE","operator":"Antamina","primary_commodity":"copper","commodities":["copper"],"hs_codes":["2603"],"purity":"high","expected_vessel_classes":["bulk_carrier","general_cargo"],"centroid":[-10.08,-78.16],"berth_polygon":[[-10.08901,-78.16915],[-10.07099,-78.16915],[-10.07099,-78.15085],[-10.08901,-78.15085]],"anchorage_radius_km":15,"notes":"Antamina slurry-pipeline terminal; dedicated copper (and zinc) concentrate.","polygon_verified":false,"source":"public"},{"id":"ilo","name":"Ilo","port":"Ilo","country":"PE","operator":"Southern Copper","primary_commodity":"copper","commodities":["copper"],"hs_codes":["7403","2603"],"purity":"medium","expected_vessel_classes":["bulk_carrier","general_cargo","container"],"centroid":[-17.64,-71.34],"berth_polygon":[[-17.64901,-71.34945],[-17.63099,-71.34945],[-17.63099,-71.33055],[-17.64901,-71.33055]],"anchorage_radius_km":12,"notes":"Southern Copper smelter/refinery outlet plus concentrate; mixed cathode/concentrate.","polygon_verified":false,"source":"public"},{"id":"callao","name":"Callao","port":"Callao","country":"PE","operator":"DP World / APM (multi)","primary_commodity":"copper","commodities":["copper"],"hs_codes":["7403","2603"],"purity":"low","expected_vessel_classes":["container","general_cargo","bulk_carrier"],"centroid":[-12.05,-77.15],"berth_polygon":[[-12.05901,-77.15921],[-12.04099,-77.15921],[-12.04099,-77.14079],[-12.05901,-77.14079]],"anchorage_radius_km":12,"notes":"Peru's main multi-commodity port. NOISY for copper unless tagged at berth level.","polygon_verified":false,"source":"public"},{"id":"lobito","name":"Terminal Mineraleiro do Lobito","port":"Lobito","country":"AO","operator":"Lobito Atlantic Railway consortium","primary_commodity":"copper","commodities":["copper"],"hs_codes":["2603","7403"],"purity":"medium","expected_vessel_classes":["bulk_carrier","general_cargo","container"],"centroid":[-12.345,13.5475],"berth_polygon":[[-12.354,13.5375],[-12.336,13.5375],[-12.336,13.5575],[-12.354,13.5575]],"anchorage_radius_km":15,"notes":"Atlantic terminus of the Lobito Corridor rail. Copper/cobalt concentrate + anodes railed from the DRC (and Zambian) Copperbelt, NOT Angolan-origin -- attribution is corridor-level, multi-origin, not single-mine. Approximate polygon over Lobito Bay / Restinga; verify before arming alerts.","polygon_verified":false,"source":"public"}]}</script>
+
+<script>
+"use strict";
+/* ============================ config ============================ */
+const DATA_BASE = "./data";           // demo view (web/data). For live, set to "http://localhost:8080" — see docs/run-on-this-pc.md
+const POLL_STATE_MS = 20000;          // near-real-time
+const POLL_ENRICH_MS = 15 * 60000;    // prices + flows
+const Z_ALERT = 2.0;
+const STALE_MS = 4 * 60000;
+
+/* ============================ helpers ============================ */
+const $ = (id) => document.getElementById(id);
+const fmt = new Intl.NumberFormat("en-US");
+const seed = (id) => { try { return JSON.parse($(id).textContent); } catch { return null; } };
+function titleCase(s){ return String(s||"").replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase()); }
+
+// flows tonnes are absolute; show kt / Mt for readability
+function tonnesDisplay(t){
+  if (t == null) return "—";
+  if (t >= 1_000_000) return (t/1_000_000).toFixed(2)+" Mt";
+  if (t >= 1000) return (t/1000).toFixed(t>=100000?0:1)+" kt";
+  return fmt.format(Math.round(t))+" t";
+}
+function relTime(iso){
+  const d = new Date(iso); if (isNaN(d)) return "—";
+  const hh = String(d.getUTCHours()).padStart(2,"0");
+  const mm = String(d.getUTCMinutes()).padStart(2,"0");
+  const age = Date.now() - d.getTime();
+  const mins = Math.round(age/60000);
+  const ago = mins<1 ? "just now" : mins<60 ? mins+"m ago" : Math.round(mins/60)+"h ago";
+  return `${hh}:${mm}Z · ${ago}`;
+}
+
+/* colour ramp for activity index (teal → sand → amber → magenta) */
+const RAMP = [[0.35,[94,143,132]],[1.0,[185,179,106]],[1.7,[225,162,75]],[2.6,[181,25,122]]];
+function activityColor(v){
+  if (v==null||isNaN(v)) return "rgb(120,138,146)";
+  v = Math.max(0.35, Math.min(2.6, v));
+  for (let i=0;i<RAMP.length-1;i++){
+    const [a,ca]=RAMP[i],[b,cb]=RAMP[i+1];
+    if (v<=b){ const t=(v-a)/(b-a||1); const c=ca.map((x,k)=>Math.round(x+(cb[k]-x)*t)); return `rgb(${c[0]},${c[1]},${c[2]})`; }
+  }
+  const c=RAMP[RAMP.length-1][1]; return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
+const COMMODITY_COLORS = {copper:"#B5713A",lithium:"#4E8C86",iron_ore:"#7A5C3E",zinc:"#5E7A86",
+  crude:"#3A3A44",lng:"#3E7C8C",coal:"#33363B",grain:"#B9A24A",sugar:"#C08A8A",default:"#5E8F84"};
+const commodityColor = (c) => COMMODITY_COLORS[c] || COMMODITY_COLORS.default;
+const VESSEL_COLORS = {cargo:"#2A4E86",tanker:"#C1622D",passenger:"#2E7D74",fishing:"#9AA0A6",
+  tug:"#6B7A82",high_speed:"#2E7D74",pleasure:"#8AA3AB",other:"#6B7A82",unknown:"#808A90"};
+const vesselColor = (c) => VESSEL_COLORS[c] || VESSEL_COLORS.other;
+
+/* tiny inline sparkline (area + line) */
+function sparkSVG(vals, w, h, stroke, fill){
+  if (!vals || !vals.length) return "";
+  const max = Math.max(...vals, 1), min = Math.min(...vals, 0), pad = 2;
+  const rng = (max-min)||1, n = vals.length;
+  const x = i => pad + i*(w-2*pad)/((n-1)||1);
+  const y = v => h-pad - ((v-min)/rng)*(h-2*pad);
+  const line = vals.map((v,i)=>`${i?"L":"M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  const area = `${line} L${x(n-1).toFixed(1)},${h-pad} L${x(0).toFixed(1)},${h-pad} Z`;
+  return `<svg class="_sp" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+    ${fill?`<path d="${area}" fill="${fill}"/>`:""}
+    <path d="${line}" fill="none" stroke="${stroke}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+  </svg>`;
+}
+
+/* ============================ state ============================ */
+let REG = seed("seed-registry") || {terminals:[],commodity_taxonomy:{}};
+let STATE = seed("seed-state") || {terminals:{},vessels:[],vessel_count:0,updated:null};
+let FLOWS = seed("seed-flows") || {flows:[]};
+let PRICES = seed("seed-prices") || {prices:{}};
+const REG_BY_ID = {}; REG.terminals.forEach(t=>REG_BY_ID[t.id]=t);
+const activeCommodities = new Set();   // empty = "off" (colour by commodity); full/subset = colour by activity
+let selectedId = null;
+let live = false;                      // true once a real fetch from DATA_BASE succeeds
+let markers = {}, vesselLayer = null, vesselRenderer = null;
+
+/* commodities present, ordered by taxonomy */
+function presentCommodities(){
+  const present = new Set();
+  REG.terminals.forEach(t => (t.commodities||[t.primary_commodity]).forEach(c=>present.add(c)));
+  const ordered = [];
+  Object.values(REG.commodity_taxonomy||{}).flat().forEach(c=>{ if(present.has(c)) ordered.push(c); });
+  present.forEach(c=>{ if(!ordered.includes(c)) ordered.push(c); });
+  return ordered;
+}
+const termCommodity = (t) => t.primary_commodity || (t.commodities||[])[0];
+function termVisible(t){
+  if (activeCommodities.size===0) return true;
+  return (t.commodities||[termCommodity(t)]).some(c=>activeCommodities.has(c));
+}
+const colorMode = () => activeCommodities.size===0 ? "commodity" : "activity";
+
+/* ============================ map ============================ */
+// If Leaflet failed to load for any reason, degrade gracefully: show a notice in
+// the map pane and leave `map` null so the data panels below still render.
+let map = null;
+if (typeof L === "undefined") {
+  const el = document.getElementById("map");
+  if (el) el.innerHTML = '<div style="padding:18px;font:13px/1.5 system-ui,sans-serif;color:#555">'
+    + 'Map library failed to load. The data panels still work; reload once you have a connection.</div>';
+} else {
+  map = L.map("map",{zoomControl:true,attributionControl:true,preferCanvas:true}).setView([-24,-71],5);
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",{
+    subdomains:"abcd", maxZoom:19,
+    attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>'
+  }).addTo(map);
+  vesselRenderer = L.canvas({padding:0.5});
+  vesselLayer = L.layerGroup().addTo(map);
+}
+
+function fitToTerminals(){
+  if (!map) return;
+  const pts = REG.terminals.map(t=>t.centroid).filter(Boolean);
+  if (pts.length){ map.fitBounds(L.latLngBounds(pts).pad(0.35)); }
+}
+
+/* ----- terminal markers ----- */
+function terminalState(id){ return (STATE.terminals||{})[id] || {}; }
+function markerHtml(t, s){
+  const idx = s.activity_index==null ? 1 : s.activity_index;
+  const size = Math.max(11, Math.min(26, 11 + idx*5));
+  const ringSize = size + 16;
+  const color = colorMode()==="commodity" ? commodityColor(termCommodity(t)) : activityColor(s.activity_index);
+  const elevated = s.z!=null && Math.abs(s.z) >= Z_ALERT;
+  const armed = s.anomaly === true;
+  const cls = ["tmark", armed?"armed":(elevated?"elevated":""), selectedId===t.id?"sel":""].join(" ").trim();
+  const ring = (elevated||armed)
+    ? `<span class="ring" style="width:${ringSize}px;height:${ringSize}px"></span>` : "";
+  return {html:`<div class="${cls}" style="width:${ringSize}px;height:${ringSize}px">
+      ${ring}<span class="core" style="width:${size}px;height:${size}px;background:${color}"></span>
+    </div>`, size:ringSize};
+}
+// (re)apply a11y + keyboard to a marker's DOM element; safe to call repeatedly
+// (onkeydown assignment can't stack duplicates, and setIcon replaces the element)
+function enhanceMarker(m,t){
+  const el = m.getElement(); if(!el) return;
+  const vis = termVisible(t), s = terminalState(t.id);
+  el.setAttribute("role","button");
+  el.setAttribute("tabindex", vis?"0":"-1");
+  el.setAttribute("aria-label",`${t.name}, activity index ${s.activity_index??"unknown"}`);
+  el.style.pointerEvents = vis?"auto":"none";
+  el.onkeydown = (e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); openPanel(t.id); } };
+}
+function tooltipFor(t,s){
+  const zTxt = s.z!=null ? ` · z <span class="z">${s.z>0?"+":""}${s.z}</span>` : "";
+  return `<b>${t.name}</b><br>${titleCase(termCommodity(t))} · idx ${s.activity_index??"—"}${zTxt}`;
+}
+function buildTerminals(){
+  if (!map) return;
+  Object.values(markers).forEach(m=>map.removeLayer(m)); markers={};
+  REG.terminals.forEach(t=>{
+    if (!t.centroid) return;
+    const s = terminalState(t.id);
+    const {html,size} = markerHtml(t,s);
+    const icon = L.divIcon({className:"tmark-wrap",html,iconSize:[size,size],iconAnchor:[size/2,size/2]});
+    const m = L.marker(t.centroid,{icon,riseOnHover:true,opacity: termVisible(t)?1:0.16, keyboard:true, title:t.name});
+    m.bindTooltip(tooltipFor(t,s),{className:"tt",direction:"top",offset:[0,-6],sticky:false});
+    m.on("click",()=>openPanel(t.id));
+    m.on("add",()=>enhanceMarker(m,t));
+    m.addTo(map); markers[t.id]=m;
+  });
+}
+function refreshTerminals(){ // re-style in place each poll (10 markers; cheap)
+  if (!map) return;
+  REG.terminals.forEach(t=>{
+    const m = markers[t.id]; if(!m) return;
+    const s = terminalState(t.id);
+    const {html,size} = markerHtml(t,s);
+    m.setIcon(L.divIcon({className:"tmark-wrap",html,iconSize:[size,size],iconAnchor:[size/2,size/2]}));
+    m.setOpacity(termVisible(t)?1:0.16);
+    m.setTooltipContent(tooltipFor(t,s));
+    enhanceMarker(m,t);   // setIcon replaced the element — reattach
+  });
+}
+
+/* ----- vessels (canvas) ----- */
+function vesselCommodity(v){ const t = v.near && REG_BY_ID[v.near]; return t ? termCommodity(t) : null; }
+function vesselVisible(v){
+  if (activeCommodities.size===0) return true;
+  const c = vesselCommodity(v); return c ? activeCommodities.has(c) : false;
+}
+function buildVessels(){
+  if (!map || !vesselLayer) return;
+  vesselLayer.clearLayers();
+  (STATE.vessels||[]).forEach(v=>{
+    if (v.lat==null||v.lon==null||!vesselVisible(v)) return;
+    const c = vesselColor(v.class);
+    const dot = L.circleMarker([v.lat,v.lon],{renderer:vesselRenderer,
+      radius: v.at_berth?5:4, weight:1, color:"#fff", opacity:.9,
+      fillColor:c, fillOpacity:.95});
+    const near = v.near ? ` · near ${REG_BY_ID[v.near]?.name||v.near}` : "";
+    dot.bindTooltip(`<b>${v.name||"vessel"}</b><br>${titleCase(v.class)} · ${v.sog??0} kn${near}`,
+      {className:"tt",direction:"top",offset:[0,-4]});
+    dot.addTo(vesselLayer);
+  });
+}
+
+/* ============================ side panel ============================ */
+function flowFor(country, commodity){
+  return (FLOWS.flows||[]).find(f=>f.country===country && f.commodity===commodity);
+}
+function openPanel(id){
+  const t = REG_BY_ID[id]; if(!t) return;
+  selectedId = id;
+  const s = terminalState(id);
+  const elevated = s.z!=null && Math.abs(s.z)>=Z_ALERT, armed = s.anomaly===true;
+
+  $("pName").textContent = t.name;
+  $("pLoc").textContent = `${t.port||""} · ${t.country||""}${t.operator?"  ·  "+t.operator:""}`;
+
+  const pur = (s.purity||t.purity||"").toLowerCase();
+  const verified = (s.polygon_verified ?? t.polygon_verified) === true;
+  $("pBadges").innerHTML = [
+    `<span class="badge commodity">${titleCase(termCommodity(t))}</span>`,
+    pur?`<span class="badge pur-${pur}">${pur} purity</span>`:"",
+    verified?`<span class="badge verified">berth verified</span>`:`<span class="badge unverified">berth unverified</span>`
+  ].join("");
+
+  const attn = (elevated||armed) ? `<div class="attn"><b>${armed?"Anomaly armed":"Elevated activity"}</b> — departures are ${s.activity_index?`${s.activity_index}×`:"well above"} the 12-week norm (z ${s.z>0?"+":""}${s.z}). ${armed?"Berth verified; alert active.":"Alert holds until the berth polygon is checked."}</div>` : "";
+
+  const metric = (k,v,hl)=>`<div class="metric ${hl?"hl":""}"><div class="metric__k">${k}</div><div class="metric__v">${v}</div></div>`;
+  const metrics = `<div class="metrics">
+    ${metric("At berth", s.at_berth??0)}
+    ${metric("In queue", s.queue??0)}
+    ${metric("Arrivals 7d", s.arrivals_7d??0)}
+    ${metric("Departures 7d", s.departures_7d??0)}
+    ${metric("Arrivals 30d", s.arrivals_30d??0)}
+    ${metric("Departures 30d", s.departures_30d??0)}
+    ${metric("Median dwell", (s.median_dwell_h!=null? s.median_dwell_h+"<small> h</small>":"—"))}
+    ${metric("Activity index", (s.activity_index!=null? s.activity_index+"<small>×</small>":"—"), elevated||armed)}
+  </div>`;
+
+  const spk = (s.sparkline&&s.sparkline.length)
+    ? sparkSVG(s.sparkline, 320, 46, activityColor(s.activity_index), "rgba(94,143,132,.18)")
+    : `<div class="metric__k">no history yet</div>`;
+
+  // customs / destination split
+  const f = flowFor(t.country, termCommodity(t));
+  let flowsBlk;
+  if (f){
+    const dests = (f.destinations||[]).map(d=>`
+      <div class="dest"><div class="dest__p">${d.partner}</div>
+        <div class="dest__bar"><div class="dest__fill" style="width:${Math.round((d.share||0)*100)}%"></div></div>
+        <div class="dest__v">${Math.round((d.share||0)*100)}%</div></div>`).join("");
+    flowsBlk = `<div class="blk"><div class="blk__hd">Destinations <em>${f.period||""}</em></div>${dests}
+      <div class="customs">Latest customs export — <b>${tonnesDisplay(f.tonnes)}</b>
+        ${f.value_usd?`<span class="muted">· $${(f.value_usd/1e9).toFixed(2)}B</span>`:""}
+        <span class="muted">(${f.source||"customs"})</span></div></div>`;
+  } else {
+    flowsBlk = `<div class="blk"><div class="blk__hd">Destinations</div>
+      <div class="customs muted">No customs match for ${t.country} / ${titleCase(termCommodity(t))} in the current dataset.</div></div>`;
+  }
+
+  $("pBody").innerHTML = attn + metrics +
+    `<div class="blk"><div class="blk__hd">Departures / day <em>30 days</em></div><div class="panelspark">${spk}</div></div>` +
+    flowsBlk +
+    (t.notes?`<div class="notes">${t.notes}</div>`:"");
+
+  const p=$("panel"); p.classList.add("open"); p.setAttribute("aria-hidden","false");
+  refreshTerminals();
+}
+function closePanel(){ const p=$("panel"); p.classList.remove("open"); p.setAttribute("aria-hidden","true"); selectedId=null; refreshTerminals(); }
+
+/* ============================ rail widgets ============================ */
+function renderChips(){
+  const box=$("chips"); const list=presentCommodities();
+  const allOn = list.length>0 && activeCommodities.size===list.length;
+  const allBtn = `<button class="chip chip__all" data-all="1" aria-pressed="${allOn}" title="Colour by activity when narrowed; by commodity when off">All</button>`;
+  box.innerHTML = allBtn + list.map(c=>`
+    <button class="chip" data-c="${c}" aria-pressed="${activeCommodities.has(c)}">
+      <span class="dot" style="background:${commodityColor(c)}"></span>${titleCase(c)}</button>`).join("");
+  box.querySelectorAll("[data-c]").forEach(b=>b.onclick=()=>{
+    const c=b.dataset.c; activeCommodities.has(c)?activeCommodities.delete(c):activeCommodities.add(c);
+    onFilterChange();
+  });
+  box.querySelector("[data-all]").onclick=()=>{
+    if (allOn) activeCommodities.clear();
+    else { activeCommodities.clear(); list.forEach(c=>activeCommodities.add(c)); }
+    onFilterChange();
+  };
+}
+function onFilterChange(){
+  renderChips(); refreshTerminals(); buildVessels(); updateLegend();
+}
+function renderPrices(){
+  const box=$("prices"); const P=PRICES.prices||{}; const keys=Object.keys(P);
+  $("priceAsof").textContent = keys.length && P[keys[0]].asof ? P[keys[0]].asof : "";
+  box.innerHTML = keys.map(k=>{
+    const p=P[k]; const up=(p.change||0)>=0;
+    const tag = p.coverage_warning ? `<span class="price__tag" title="${p.coverage_warning.replace(/"/g,"&quot;")}">indicative</span>` : "";
+    const spk = p.history&&p.history.length ? sparkSVG(p.history,150,26, up?"#2E7D74":"#C05A2B", "rgba(46,125,116,.14)") : "";
+    const stock = p.lme_stocks ? `<div class="stock" title="${(p.lme_stocks.note||"").replace(/"/g,"&quot;")}">LME stock ${fmt.format(p.lme_stocks.tonnes)} t <span class="chg ${p.lme_stocks.change>=0?"up":"down"}">${p.lme_stocks.change>=0?"▲":"▼"}${Math.abs(p.lme_stocks.change)}%</span></div>` : "";
+    return `<div class="price" title="${(p.source||"").replace(/"/g,"&quot;")}">
+      <div class="price__top"><span class="price__name">${titleCase(k)}</span>${tag}</div>
+      <div class="price__val">${fmt.format(p.price)}</div>
+      <div class="price__row"><span class="price__unit">${p.unit||""}</span>
+        <span class="chg ${up?"up":"down"}">${up?"▲":"▼"} ${Math.abs(p.change||0)}%</span></div>
+      ${spk}${stock}</div>`;
+  }).join("") || `<div class="metric__k">prices unavailable</div>`;
+}
+function renderFlows(){
+  const box=$("flows"); const F=FLOWS.flows||[]; const trend=FLOWS.trend||{};
+  $("flowsPeriod").textContent = FLOWS.period ? `${FLOWS.period} · lags 1–3 mo` : "";
+  box.innerHTML = F.map(f=>{
+    const key=`${f.country}_${f.commodity}`; const tr=trend[key];
+    const top=(f.destinations||[])[0];
+    const spk = tr&&tr.length ? sparkSVG(tr,270,22,"#8fd6cb","rgba(46,125,116,.16)") : "";
+    return `<div class="flow">
+      <div class="flow__hd"><span class="flow__name"><b>${f.country}</b> · ${titleCase(f.commodity)}</span>
+        <span class="flow__vol">${tonnesDisplay(f.tonnes)}</span></div>
+      ${top?`<div class="flow__dest">→ ${top.partner} ${Math.round((top.share||0)*100)}% of exports</div>`:""}
+      ${spk}</div>`;
+  }).join("") || `<div class="metric__k">flows unavailable</div>`;
+}
+function updateLegend(){
+  const commodityMode = colorMode()==="commodity";
+  $("legendMode").textContent = commodityMode ? "by commodity" : "by activity index";
+  $("legendActivity").style.display = commodityMode ? "none" : "block";
+  const lc = $("legendCommodities"); lc.style.display = commodityMode ? "flex" : "none";
+  if (commodityMode){
+    lc.innerHTML = presentCommodities().map(c=>`<div class="legend__row"><span class="sw" style="background:${commodityColor(c)}"></span> ${titleCase(c)}</div>`).join("");
+  }
+}
+
+/* ============================ status + polling ============================ */
+function inferMode(){
+  const v=STATE.vessels||[];
+  if (STATE.mode) return STATE.mode.toUpperCase();
+  if (v.some(x=>/^sim\b/i.test(x.name||""))) return "SIM";
+  return v.length ? "LIVE" : "STANDBY";
+}
+function renderStatus(){
+  const pip=$("pip");
+  $("vcount").textContent = STATE.vessel_count ?? (STATE.vessels||[]).length;
+  if (!live){                                   // running off the bundled seed
+    $("feedmode").innerHTML = `<b>SAMPLE DATA</b>`;
+    $("updated").textContent = "bundled demo · start the collector for live";
+    pip.classList.remove("live","stale");        // neutral idle dot
+    return;
+  }
+  $("feedmode").innerHTML = `<b>${inferMode()} FEED</b>`;
+  const up = STATE.updated;
+  $("updated").textContent = up ? relTime(up) : "no data yet";
+  const stale = up ? (Date.now()-new Date(up).getTime() > STALE_MS) : true;
+  pip.classList.toggle("stale", stale); pip.classList.toggle("live", !stale);
+}
+function showToast(msg){ const t=$("toast"); t.textContent=msg; t.classList.add("show"); }
+function hideToast(){ $("toast").classList.remove("show"); }
+
+async function pull(name){
+  const r = await fetch(`${DATA_BASE}/${name}?_=${Date.now()}`, {cache:"no-store"});
+  if (!r.ok) throw new Error(name+" "+r.status);
+  return r.json();
+}
+async function pollState(){
+  try{
+    const s = await pull("state.json"); STATE=s; live=true;
+    STATE.terminals=STATE.terminals||{}; STATE.vessels=STATE.vessels||[];
+    hideToast(); renderStatus(); refreshTerminals(); buildVessels();
+    if (selectedId) openPanel(selectedId); // refresh open panel numbers
+  }catch(e){
+    renderStatus();
+    if (!(STATE.updated)) showToast("Waiting for the collector — start it with the simulator or a live AIS key and this map fills in. (Showing bundled sample.)");
+  }
+}
+async function pollEnrich(){
+  try{ FLOWS = await pull("flows.json"); }catch{}
+  try{ PRICES = await pull("prices.json"); }catch{}
+  renderPrices(); renderFlows();
+}
+
+/* ============================ wire up ============================ */
+function openSheet(){ $("sheet").classList.add("open"); $("sheetClose").focus(); }
+function closeSheet(){ $("sheet").classList.remove("open"); }
+$("methodBtn").onclick=openSheet; $("methodLink").onclick=openSheet;
+$("sheetClose").onclick=closeSheet;
+$("sheet").addEventListener("click",e=>{ if(e.target===$("sheet")) closeSheet(); });
+$("panelClose").onclick=closePanel;
+document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ closeSheet(); closePanel(); } });
+
+/* boot with embedded seed, then go live */
+presentCommodities().forEach(c=>activeCommodities.add(c));  // default: activity heat-map on
+fitToTerminals();
+buildTerminals();
+buildVessels();
+renderChips();
+renderPrices();
+renderFlows();
+updateLegend();
+renderStatus();
+
+pollState(); pollEnrich();
+setInterval(pollState, POLL_STATE_MS);
+setInterval(pollEnrich, POLL_ENRICH_MS);
+</script>
+</body>
+</html>

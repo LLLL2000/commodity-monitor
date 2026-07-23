@@ -1,0 +1,28 @@
+name: prices
+# Daily price/inventory refresh -> data/prices.json
+on:
+  schedule:
+    - cron: "30 6 * * 1-5"   # 06:30 UTC on weekdays (markets closed on weekends)
+  workflow_dispatch:
+
+jobs:
+  prices:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r jobs/requirements.txt
+      - run: python -m jobs.prices_job
+      - name: Commit if changed
+        run: |
+          git config user.name "prices-bot"
+          git config user.email "prices-bot@users.noreply.github.com"
+          if ! git diff --quiet -- data/prices.json; then
+            git add data/prices.json
+            git commit -m "prices: refresh $(date -u +%Y-%m-%d)"
+            git push
+          else
+            echo "no change"
+          fi

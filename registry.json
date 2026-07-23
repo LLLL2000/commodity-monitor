@@ -1,0 +1,596 @@
+{
+  "_readme": "Berth registry = the heart of the system. Add coverage by adding terminals (and, if needed, taxonomy strings) here ONLY. Never hardcode commodities/terminals in code. berth_polygon are FIRST-PASS ~2 km boxes and MUST be verified/redrawn (set polygon_verified:true) before trusting high-purity alerts.",
+  "version": 1,
+  "country_meta": {
+    "CL": {
+      "name": "Chile",
+      "comtrade_reporter": "152"
+    },
+    "PE": {
+      "name": "Peru",
+      "comtrade_reporter": "604"
+    },
+    "AR": {
+      "name": "Argentina",
+      "comtrade_reporter": "032"
+    },
+    "AO": {
+      "name": "Angola",
+      "comtrade_reporter": "024"
+    }
+  },
+  "commodity_taxonomy": {
+    "energy": [
+      "crude",
+      "products",
+      "lng",
+      "lpg",
+      "ammonia",
+      "coal"
+    ],
+    "metals": [
+      "copper",
+      "iron_ore",
+      "bauxite",
+      "alumina",
+      "lithium",
+      "zinc"
+    ],
+    "ags": [
+      "grain",
+      "soybeans",
+      "corn",
+      "sugar",
+      "palm_oil"
+    ]
+  },
+  "_hs_commodity_readme": "HS code -> commodity for customs attribution (flows_job). Copper headings (2603 ore, 7403 refined) auto-derive from copper-only terminals; lithium subheadings are listed explicitly because they only appear on dual-commodity berths. Add an entry here when a new HS code is introduced on a multi-commodity terminal.",
+  "hs_commodity": {
+    "2603": "copper",
+    "7403": "copper",
+    "2836.91": "lithium",
+    "2825.20": "lithium"
+  },
+  "vessel_class_hint": {
+    "tanker": [
+      "crude",
+      "products",
+      "palm_oil"
+    ],
+    "gas_carrier": [
+      "lng",
+      "lpg",
+      "ammonia"
+    ],
+    "bulk_carrier": [
+      "iron_ore",
+      "coal",
+      "bauxite",
+      "alumina",
+      "grain",
+      "soybeans",
+      "corn",
+      "copper",
+      "zinc"
+    ],
+    "container": [
+      "lithium",
+      "products"
+    ]
+  },
+  "terminals": [
+    {
+      "id": "coloso",
+      "name": "Puerto Coloso",
+      "port": "Antofagasta",
+      "country": "CL",
+      "operator": "Escondida (BHP)",
+      "primary_commodity": "copper",
+      "commodities": [
+        "copper"
+      ],
+      "hs_codes": [
+        "2603"
+      ],
+      "purity": "high",
+      "expected_vessel_classes": [
+        "bulk_carrier",
+        "general_cargo"
+      ],
+      "centroid": [
+        -23.75,
+        -70.47
+      ],
+      "berth_polygon": [
+        [
+          -23.75901,
+          -70.47984
+        ],
+        [
+          -23.74099,
+          -70.47984
+        ],
+        [
+          -23.74099,
+          -70.46016
+        ],
+        [
+          -23.75901,
+          -70.46016
+        ]
+      ],
+      "anchorage_radius_km": 15,
+      "notes": "Single-mine slurry-pipeline terminal; a bulk carrier here ≈ Escondida copper concentrate.",
+      "polygon_verified": false,
+      "source": "public"
+    },
+    {
+      "id": "patache",
+      "name": "Punta Patache / Patillos",
+      "port": "Iquique",
+      "country": "CL",
+      "operator": "Collahuasi",
+      "primary_commodity": "copper",
+      "commodities": [
+        "copper"
+      ],
+      "hs_codes": [
+        "2603"
+      ],
+      "purity": "high",
+      "expected_vessel_classes": [
+        "bulk_carrier",
+        "general_cargo"
+      ],
+      "centroid": [
+        -20.8,
+        -70.16
+      ],
+      "berth_polygon": [
+        [
+          -20.80901,
+          -70.16964
+        ],
+        [
+          -20.79099,
+          -70.16964
+        ],
+        [
+          -20.79099,
+          -70.15036
+        ],
+        [
+          -20.80901,
+          -70.15036
+        ]
+      ],
+      "anchorage_radius_km": 15,
+      "notes": "Dedicated Collahuasi concentrate terminal; high-confidence copper signal.",
+      "polygon_verified": false,
+      "source": "public"
+    },
+    {
+      "id": "mejillones",
+      "name": "Mejillones (Angamos / TGN)",
+      "port": "Mejillones",
+      "country": "CL",
+      "operator": "Codelco / multi",
+      "primary_commodity": "copper",
+      "commodities": [
+        "copper",
+        "lithium"
+      ],
+      "hs_codes": [
+        "2603",
+        "7403",
+        "2836.91"
+      ],
+      "purity": "medium",
+      "expected_vessel_classes": [
+        "bulk_carrier",
+        "general_cargo",
+        "container"
+      ],
+      "centroid": [
+        -23.1,
+        -70.45
+      ],
+      "berth_polygon": [
+        [
+          -23.10901,
+          -70.45979
+        ],
+        [
+          -23.09099,
+          -70.45979
+        ],
+        [
+          -23.09099,
+          -70.44021
+        ],
+        [
+          -23.10901,
+          -70.44021
+        ]
+      ],
+      "anchorage_radius_km": 15,
+      "notes": "Multi-operator complex; copper cathode/concentrate + some lithium. Tag at berth level to lift purity.",
+      "polygon_verified": false,
+      "source": "public"
+    },
+    {
+      "id": "antofagasta",
+      "name": "Antofagasta (ATI)",
+      "port": "Antofagasta",
+      "country": "CL",
+      "operator": "Codelco / SQM",
+      "primary_commodity": "copper",
+      "commodities": [
+        "copper",
+        "lithium"
+      ],
+      "hs_codes": [
+        "7403",
+        "2603",
+        "2836.91",
+        "2825.20"
+      ],
+      "purity": "medium",
+      "expected_vessel_classes": [
+        "general_cargo",
+        "container",
+        "bulk_carrier"
+      ],
+      "centroid": [
+        -23.64,
+        -70.4
+      ],
+      "berth_polygon": [
+        [
+          -23.64901,
+          -70.40983
+        ],
+        [
+          -23.63099,
+          -70.40983
+        ],
+        [
+          -23.63099,
+          -70.39017
+        ],
+        [
+          -23.64901,
+          -70.39017
+        ]
+      ],
+      "anchorage_radius_km": 12,
+      "notes": "City port handling Codelco copper + SQM lithium chemicals (largely containerised). Mixed signal.",
+      "polygon_verified": false,
+      "source": "public"
+    },
+    {
+      "id": "ventanas",
+      "name": "Ventanas (Quintero)",
+      "port": "Quintero",
+      "country": "CL",
+      "operator": "Codelco refinery",
+      "primary_commodity": "copper",
+      "commodities": [
+        "copper"
+      ],
+      "hs_codes": [
+        "7403"
+      ],
+      "purity": "medium",
+      "expected_vessel_classes": [
+        "general_cargo",
+        "container",
+        "bulk_carrier"
+      ],
+      "centroid": [
+        -32.75,
+        -71.48
+      ],
+      "berth_polygon": [
+        [
+          -32.75901,
+          -71.49071
+        ],
+        [
+          -32.74099,
+          -71.49071
+        ],
+        [
+          -32.74099,
+          -71.46929
+        ],
+        [
+          -32.75901,
+          -71.46929
+        ]
+      ],
+      "anchorage_radius_km": 12,
+      "notes": "Codelco refinery outlet; refined cathodes (7403), some break-bulk/container.",
+      "polygon_verified": false,
+      "source": "public"
+    },
+    {
+      "id": "sanantonio",
+      "name": "San Antonio",
+      "port": "San Antonio",
+      "country": "CL",
+      "operator": "Andina / El Teniente (multi)",
+      "primary_commodity": "copper",
+      "commodities": [
+        "copper"
+      ],
+      "hs_codes": [
+        "7403",
+        "2603"
+      ],
+      "purity": "low",
+      "expected_vessel_classes": [
+        "container",
+        "general_cargo",
+        "bulk_carrier"
+      ],
+      "centroid": [
+        -33.59,
+        -71.61
+      ],
+      "berth_polygon": [
+        [
+          -33.59901,
+          -71.62081
+        ],
+        [
+          -33.58099,
+          -71.62081
+        ],
+        [
+          -33.58099,
+          -71.59919
+        ],
+        [
+          -33.59901,
+          -71.59919
+        ]
+      ],
+      "anchorage_radius_km": 12,
+      "notes": "Large multi-commodity gateway. NOISY for copper unless tagged at berth level.",
+      "polygon_verified": false,
+      "source": "public"
+    },
+    {
+      "id": "matarani",
+      "name": "Matarani (TISUR)",
+      "port": "Matarani",
+      "country": "PE",
+      "operator": "Cerro Verde, Las Bambas",
+      "primary_commodity": "copper",
+      "commodities": [
+        "copper"
+      ],
+      "hs_codes": [
+        "2603"
+      ],
+      "purity": "high",
+      "expected_vessel_classes": [
+        "bulk_carrier",
+        "general_cargo"
+      ],
+      "centroid": [
+        -17.0,
+        -72.1
+      ],
+      "berth_polygon": [
+        [
+          -17.00901,
+          -72.10942
+        ],
+        [
+          -16.99099,
+          -72.10942
+        ],
+        [
+          -16.99099,
+          -72.09058
+        ],
+        [
+          -17.00901,
+          -72.09058
+        ]
+      ],
+      "anchorage_radius_km": 15,
+      "notes": "Concentrate outlet for Cerro Verde & Las Bambas; strong copper signal.",
+      "polygon_verified": false,
+      "source": "public"
+    },
+    {
+      "id": "puntalobitos",
+      "name": "Punta Lobitos (Huarmey)",
+      "port": "Huarmey",
+      "country": "PE",
+      "operator": "Antamina",
+      "primary_commodity": "copper",
+      "commodities": [
+        "copper"
+      ],
+      "hs_codes": [
+        "2603"
+      ],
+      "purity": "high",
+      "expected_vessel_classes": [
+        "bulk_carrier",
+        "general_cargo"
+      ],
+      "centroid": [
+        -10.08,
+        -78.16
+      ],
+      "berth_polygon": [
+        [
+          -10.08901,
+          -78.16915
+        ],
+        [
+          -10.07099,
+          -78.16915
+        ],
+        [
+          -10.07099,
+          -78.15085
+        ],
+        [
+          -10.08901,
+          -78.15085
+        ]
+      ],
+      "anchorage_radius_km": 15,
+      "notes": "Antamina slurry-pipeline terminal; dedicated copper (and zinc) concentrate.",
+      "polygon_verified": false,
+      "source": "public"
+    },
+    {
+      "id": "ilo",
+      "name": "Ilo",
+      "port": "Ilo",
+      "country": "PE",
+      "operator": "Southern Copper",
+      "primary_commodity": "copper",
+      "commodities": [
+        "copper"
+      ],
+      "hs_codes": [
+        "7403",
+        "2603"
+      ],
+      "purity": "medium",
+      "expected_vessel_classes": [
+        "bulk_carrier",
+        "general_cargo",
+        "container"
+      ],
+      "centroid": [
+        -17.64,
+        -71.34
+      ],
+      "berth_polygon": [
+        [
+          -17.64901,
+          -71.34945
+        ],
+        [
+          -17.63099,
+          -71.34945
+        ],
+        [
+          -17.63099,
+          -71.33055
+        ],
+        [
+          -17.64901,
+          -71.33055
+        ]
+      ],
+      "anchorage_radius_km": 12,
+      "notes": "Southern Copper smelter/refinery outlet plus concentrate; mixed cathode/concentrate.",
+      "polygon_verified": false,
+      "source": "public"
+    },
+    {
+      "id": "callao",
+      "name": "Callao",
+      "port": "Callao",
+      "country": "PE",
+      "operator": "DP World / APM (multi)",
+      "primary_commodity": "copper",
+      "commodities": [
+        "copper"
+      ],
+      "hs_codes": [
+        "7403",
+        "2603"
+      ],
+      "purity": "low",
+      "expected_vessel_classes": [
+        "container",
+        "general_cargo",
+        "bulk_carrier"
+      ],
+      "centroid": [
+        -12.05,
+        -77.15
+      ],
+      "berth_polygon": [
+        [
+          -12.05901,
+          -77.15921
+        ],
+        [
+          -12.04099,
+          -77.15921
+        ],
+        [
+          -12.04099,
+          -77.14079
+        ],
+        [
+          -12.05901,
+          -77.14079
+        ]
+      ],
+      "anchorage_radius_km": 12,
+      "notes": "Peru's main multi-commodity port. NOISY for copper unless tagged at berth level.",
+      "polygon_verified": false,
+      "source": "public"
+    },
+    {
+      "id": "lobito",
+      "name": "Terminal Mineraleiro do Lobito",
+      "port": "Lobito",
+      "country": "AO",
+      "operator": "Lobito Atlantic Railway consortium",
+      "primary_commodity": "copper",
+      "commodities": [
+        "copper"
+      ],
+      "hs_codes": [
+        "2603",
+        "7403"
+      ],
+      "purity": "medium",
+      "expected_vessel_classes": [
+        "bulk_carrier",
+        "general_cargo",
+        "container"
+      ],
+      "centroid": [
+        -12.345,
+        13.5475
+      ],
+      "berth_polygon": [
+        [
+          -12.354,
+          13.5375
+        ],
+        [
+          -12.336,
+          13.5375
+        ],
+        [
+          -12.336,
+          13.5575
+        ],
+        [
+          -12.354,
+          13.5575
+        ]
+      ],
+      "anchorage_radius_km": 15,
+      "notes": "Atlantic terminus of the Lobito Corridor rail. Copper/cobalt concentrate + anodes railed from the DRC (and Zambian) Copperbelt, NOT Angolan-origin -- attribution is corridor-level, multi-origin, not single-mine. Approximate polygon over Lobito Bay / Restinga; verify before arming alerts.",
+      "polygon_verified": false,
+      "source": "public"
+    }
+  ]
+}

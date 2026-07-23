@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Secrets — NEVER commit (real keys live here)
+.env
+*.key
+
+# Local runtime artifacts (SQLite DB, WAL/SHM, logs, backups, tmp snapshots)
+data/collector.db*
+*.demo-seed-backup
+*.log
+data/state.json.tmp

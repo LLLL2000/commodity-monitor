@@ -1,0 +1,4 @@
+# One-shot local dev install:  pip install -r requirements-dev.txt
+-r collector/requirements.txt
+-r jobs/requirements.txt
+pytest>=8
