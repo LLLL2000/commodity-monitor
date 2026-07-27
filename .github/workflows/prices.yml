@@ -5,6 +5,10 @@ on:
     - cron: "30 6 * * 1-5"   # 06:30 UTC on weekdays (markets closed on weekends)
   workflow_dispatch:
 
+# Let the bot push the refreshed JSON back to the repo (default token is read-only).
+permissions:
+  contents: write
+
 jobs:
   prices:
     runs-on: ubuntu-latest
